@@ -71,6 +71,69 @@
   // Buttons
   closeBtn.addEventListener('click', () => { const closed = window.close(); setTimeout(() => { canvas.style.display='none'; titleEl.innerHTML='<h1>Good night.</h1><p style="color:#a3b2c7">You can close this tab now.</p>'; }, 50); });
   reloadBtn.addEventListener('click', () => location.reload());
+// 1) Add this helper near your other helpers (outside draw()):
+function drawMoth(m) {
+  const s = m.size;
+  const marked = m.markedUntil > state.t;
+  const ang = Math.atan2(m.vy, m.vx);
+
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  ctx.rotate(ang);
+
+  // soft pink halo when marked (clear but gentle)
+  if (marked) {
+    const rem = Math.max(0, Math.min(1, (m.markedUntil - state.t) / state.markDurationMs));
+    const glow = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 2.6);
+    glow.addColorStop(0, `rgba(255,140,170,${0.30 * rem})`);
+    glow.addColorStop(1, `rgba(255,140,170,0)`);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, s * 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // WINGS — bigger, clearer, outlined
+  const wingFill = marked ? 'hsl(340,60%,82%)' : 'hsl(48,84%,78%)'; // soft pink vs pale gold
+  const wingEdge = 'rgba(28,33,46,0.7)';
+  ctx.fillStyle = wingFill;
+  ctx.strokeStyle = wingEdge;
+  ctx.lineWidth = 0.9 * DPR;
+
+  // left wing (two curves forming a leaf shape)
+  ctx.beginPath();
+  ctx.moveTo(-0.10 * s, 0);
+  ctx.quadraticCurveTo(-1.25 * s, -0.95 * s, -2.25 * s, 0);
+  ctx.quadraticCurveTo(-1.25 * s, 0.95 * s, -0.10 * s, 0);
+  ctx.fill(); ctx.stroke();
+
+  // right wing (mirror)
+  ctx.beginPath();
+  ctx.moveTo(0.10 * s, 0);
+  ctx.quadraticCurveTo(1.25 * s, -0.95 * s, 2.25 * s, 0);
+  ctx.quadraticCurveTo(1.25 * s, 0.95 * s, 0.10 * s, 0);
+  ctx.fill(); ctx.stroke();
+
+  // subtle wing “vein”
+  ctx.strokeStyle = 'rgba(28,33,46,0.35)';
+  ctx.lineWidth = 0.6 * DPR;
+  ctx.beginPath(); ctx.moveTo(-0.1 * s, 0); ctx.lineTo(-1.4 * s, 0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0.1 * s, 0); ctx.lineTo(1.4 * s, 0); ctx.stroke();
+
+  // BODY — a small capsule with outline
+  ctx.fillStyle = 'hsl(42,26%,74%)';
+  ctx.strokeStyle = 'rgba(28,33,46,0.8)';
+  ctx.lineWidth = 1.1 * DPR;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.48 * s, 1.12 * s, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // head/eye
+  ctx.fillStyle = '#1c212e';
+  ctx.beginPath(); ctx.arc(0.42 * s, -0.05 * s, 0.12 * s, 0, Math.PI * 2); ctx.fill();
+
+  ctx.restore();
+}
 
   // ==== Audio (WebAudio) ====
   let audioCtx = null; // created on first user gesture
@@ -288,11 +351,11 @@
     drawBocals();
 
     // Candle
-    const cpos = candlePosAvoidingBocals(state.mouse.x, state.mouse.y); const cx=cpos.x, cy=cpos.y, cr=state.candle.r;
-    const g = ctx.createRadialGradient(cx,cy,3, cx,cy, cr); g.addColorStop(0,'rgba(233,216,166,0.85)'); g.addColorStop(0.35,'rgba(233,216,166,0.22)'); g.addColorStop(1,'rgba(233,216,166,0)'); ctx.globalCompositeOperation='lighter'; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,cr,0,Math.PI*2); ctx.fill(); ctx.globalCompositeOperation='source-over'; ctx.fillStyle='#e9d8a6'; ctx.beginPath(); ctx.arc(cx,cy,7*devicePixelRatio,0,Math.PI*2); ctx.fill();
+    const cpos = candlePosAvoidingBocals(state.mouse.x, state.mouse.y); const cx=cpos.x, cy=cpos.y, cr=state.candle.r;// 2) In your draw() function, replace the existing moth loop with this:
+for (const m of state.moths) {
+  drawMoth(m);
+}
 
-    // Moths
-    for(const m of state.moths){ const ang=Math.atan2(m.vy,m.vx); ctx.save(); ctx.translate(m.x,m.y); ctx.rotate(ang); if(m.markedUntil>state.t){ const rem = clamp((m.markedUntil - state.t)/state.markDurationMs, 0, 1); const glow = ctx.createRadialGradient(0,0, m.size*0.2, 0,0, m.size*2.2); glow.addColorStop(0, `rgba(255,140,170,${0.28*rem})`); glow.addColorStop(1, `rgba(255,140,170,0)`); ctx.globalCompositeOperation='lighter'; ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(0,0, m.size*2.2, 0, Math.PI*2); ctx.fill(); ctx.globalCompositeOperation='source-over'; } ctx.fillStyle=m.color; ctx.beginPath(); const s=m.size; ctx.moveTo(-.8*s,0); ctx.quadraticCurveTo(-.2*s,-.6*s,.8*s,0); ctx.quadraticCurveTo(-.2*s,.6*s,-.8*s,0); ctx.fill(); ctx.fillStyle='#1c212e'; ctx.beginPath(); ctx.arc(.25*s,0,.12*s,0,Math.PI*2); ctx.fill(); ctx.restore(); }
 
     // Vignette
     const vg = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2, W/2,H/2,Math.max(W,H)*0.7); vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.45)'); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
